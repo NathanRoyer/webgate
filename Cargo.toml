@@ -6,6 +6,8 @@ authors = [ "Nathan ROYER <nathan.royer.pro@gmail.com>" ]
 description = "Configurable remote command execution via WebSockets and static file service via HTTP"
 license = "MIT"
 keywords = ["cli", "http", "websockets", "process", "pipe"]
+repository = "https://github.com/NathanRoyer/webgate/"
+readme = "README.md"
 
 [[bin]]
 name = "webgate"

@@ -202,7 +202,7 @@ impl Protocol for WsSession {
 				Ok(len) if len > 0 => len,
 				_ => return self.process_exit(),
 			};
-			self.send_ws_message(&bytes[0..len]);
+			self.send_ws_message(&bytes[0..len + 1]);
 		} else {
 			let pipe = self.process.as_mut().unwrap().stderr.as_mut().unwrap();
 			let mut bytes = [PROCESS_SERR; 1024];
@@ -210,7 +210,7 @@ impl Protocol for WsSession {
 				Ok(len) if len > 0 => len,
 				_ => return self.process_exit(),
 			};
-			self.send_ws_message(&bytes[0..len]);
+			self.send_ws_message(&bytes[0..len + 1]);
 		}
 		ret_val
 	}

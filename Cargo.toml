@@ -1,6 +1,6 @@
 [package]
 name = "webgate"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = [ "Nathan ROYER <nathan.royer.pro@gmail.com>" ]
 description = "Configurable remote command execution via WebSockets and static file service via HTTP"

@@ -1,7 +1,7 @@
 # webgate
 
 This command line utility allows you to:
-- serve static files listed in a config file
+- serve files and directories listed in a config file
 - remotely run shell commands listed in a config file
 
 The command's output is piped via websockets to the client as the command runs.
@@ -15,24 +15,29 @@ Here is an example config file:
 {
 	"address": "127.0.0.1:9001",
 	"files": {
-		"/index": ["static/index.html", "text/html"],
-		"/favicon.png": ["static/favicon.png", "image/png"]
+		"index": ["static/index.html", "text/html"],
+		"favicon.png": ["static/favicon.png", "image/png"]
+	},
+	"directories": {
+		"dl": ["./dyn-service", "audio/flac"]
 	},
 	"not_found": "static/not_found.html",
 	"server": "basmati",
 	"commands": {
-		"/pwd": ["pwd"],
-		"/ls": ["ls", "-lha"],
-		"/sh": ["sh"]
+		"pwd": ["pwd"],
+		"ls": ["ls", "-lha"],
+		"sh": ["sh"]
 	}
 }
 ```
 
-This would expose two files over HTTP on 127.0.0.1:9001, as well as three commands.
+This would expose two files over HTTP on 127.0.0.1:9001, the "dyn-service" directory, as well as three commands.
 
 Notes:
 - The `server` key is what will be used as HTTP "Server" Response Header.
-- The keys in `files` and `commands` must begin with a slash (`/`) so that they can be used to match the path in HTTP requests.
+- The files in `files` will be loaded from storage to RAM when webgate is launched.
+- The files in the exposed directories are read from storage once requested, unlike those in `files`.
+- The files in the exposed directories will have the specified mime type.
 
 ### Example command run code
 

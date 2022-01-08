@@ -133,10 +133,14 @@ impl Protocol for HttpSession {
 			Some(tuple) => tuple,
 			None => return Continue,
 		};
-		println!("http: {}://localhost{}", ["http", "ws"][ws.is_some() as usize], &path);
+		let path = match path.chars().nth(0) {
+			Some('/') => &path[1..],
+			_ => path.as_str(),
+		};
+		println!("http: {}://localhost/{}", ["http", "ws"][ws.is_some() as usize], &path);
 		if let Some(key) = ws {
 			// pending ws upgrade
-			if let Some(cmd) = CONFIG.commands.get(&path) {
+			if let Some(cmd) = CONFIG.commands.get(path) {
 				let mut stream = self.stream.pop().unwrap();
 				let _ = stream.write(&ws_handshake(key));
 				ReplaceWith(Box::new(WsSession::new(stream, cmd)))
@@ -145,11 +149,24 @@ impl Protocol for HttpSession {
 				Remove
 			}
 		} else {
-			// static http service
-			let _ = self.stream[0].write(match RESOURCES.get(path.as_str()) {
-				Some(bytes) => bytes,
-				None => &NOT_FOUND,
-			});
+			// file service
+			let mut response: &[u8] = &NOT_FOUND;
+			let mut _resp_mem_slot = None;
+			let parts = path.split('/').collect::<Vec<&str>>();
+			if let Some(r) = RESOURCES.get(path) {
+				response = &r;
+			} else if parts.len() == 2 {
+				let dir = parts[0];
+				let file = &path[dir.len()..];
+				if let Some((drive_path, mime)) = CONFIG.directories.get(dir) {
+					let path = String::from(drive_path) + file;
+					if let Ok(bytes) = read(path) {
+						_resp_mem_slot = Some(resp("200 OK", &bytes, mime.as_str()));
+						response = _resp_mem_slot.as_ref().unwrap();
+					}
+				}
+			}
+			let _ = self.stream[0].write(response);
 			Remove
 		}
 	}

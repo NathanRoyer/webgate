@@ -1,6 +1,6 @@
 [package]
 name = "webgate"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = [ "Nathan ROYER <nathan.royer.pro@gmail.com>" ]
 description = "Tool to create web interfaces to command-line tools"
@@ -19,3 +19,4 @@ base64 = "0.13"
 sha1 = "0.6"
 byteorder = "1"
 json = "0.12"
+urlencoding = "2.1"

@@ -4,8 +4,9 @@ use std::io::Write;
 use std::os::unix::io::RawFd;
 use std::os::unix::io::AsRawFd;
 use std::collections::HashMap;
-use std::mem::swap;
 use std::str::from_utf8;
+use std::ops::Deref;
+use std::mem::swap;
 use std::fs::read;
 
 use crate::ProtocolEvent::ReplaceWith;
@@ -20,8 +21,9 @@ use popol::interest::READ;
 use crate::websockets::WsSession;
 use crate::CONFIG;
 
+use urlencoding::decode as url_decode;
 use lazy_static::lazy_static;
-use base64::encode;
+use base64::encode as b64_encode;
 use sha1::Sha1;
 
 fn read_file(path: &str) -> Vec<u8> {
@@ -44,7 +46,7 @@ fn resp(code: &'static str, content: &[u8], mime: &'static str) -> Vec<u8> {
 
 fn ws_handshake(mut key: String) -> Vec<u8> {
 	key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-	let resp_key = encode(Sha1::from(key).digest().bytes());
+	let resp_key = b64_encode(Sha1::from(key).digest().bytes());
 	let mut response = Vec::with_capacity(200);
 	response.extend_from_slice(HANDSHAKE_PREFIX.as_bytes());
 	response.extend_from_slice(resp_key.as_bytes());
@@ -133,41 +135,39 @@ impl Protocol for HttpSession {
 			Some(tuple) => tuple,
 			None => return Continue,
 		};
-		let path = match path.chars().nth(0) {
+		let mut response: &[u8] = &NOT_FOUND;
+		let mut _resp_mem_slot = None;
+		if let Ok(path) = url_decode(match path.chars().nth(0) {
 			Some('/') => &path[1..],
 			_ => path.as_str(),
-		};
-		println!("http: {}://localhost/{}", ["http", "ws"][ws.is_some() as usize], &path);
-		if let Some(key) = ws {
-			// pending ws upgrade
-			if let Some(cmd) = CONFIG.commands.get(path) {
-				let mut stream = self.stream.pop().unwrap();
-				let _ = stream.write(&ws_handshake(key));
-				ReplaceWith(Box::new(WsSession::new(stream, cmd)))
+		}) {
+			println!("http: {}://localhost/{}", ["http", "ws"][ws.is_some() as usize], &path);
+			if let Some(key) = ws {
+				// pending ws upgrade
+				if let Some(cmd) = CONFIG.commands.get(path.deref()) {
+					let mut stream = self.stream.pop().unwrap();
+					let _ = stream.write(&ws_handshake(key));
+					return ReplaceWith(Box::new(WsSession::new(stream, cmd)))
+				}
 			} else {
-				let _ = self.stream[0].write(&NOT_FOUND);
-				Remove
-			}
-		} else {
-			// file service
-			let mut response: &[u8] = &NOT_FOUND;
-			let mut _resp_mem_slot = None;
-			let parts = path.split('/').collect::<Vec<&str>>();
-			if let Some(r) = RESOURCES.get(path) {
-				response = &r;
-			} else if parts.len() == 2 {
-				let dir = parts[0];
-				let file = &path[dir.len()..];
-				if let Some((drive_path, mime)) = CONFIG.directories.get(dir) {
-					let path = String::from(drive_path) + file;
-					if let Ok(bytes) = read(path) {
-						_resp_mem_slot = Some(resp("200 OK", &bytes, mime.as_str()));
-						response = _resp_mem_slot.as_ref().unwrap();
+				// file service
+				let parts = path.split('/').collect::<Vec<&str>>();
+				if let Some(r) = RESOURCES.get(path.deref()) {
+					response = &r;
+				} else if parts.len() == 2 {
+					let dir = parts[0];
+					let file = &path[dir.len()..];
+					if let Some((drive_path, mime)) = CONFIG.directories.get(dir) {
+						let path = String::from(drive_path) + file;
+						if let Ok(bytes) = read(path) {
+							_resp_mem_slot = Some(resp("200 OK", &bytes, mime.as_str()));
+							response = _resp_mem_slot.as_ref().unwrap();
+						}
 					}
 				}
 			}
-			let _ = self.stream[0].write(response);
-			Remove
 		}
+		let _ = self.stream[0].write(response);
+		Remove
 	}
 }
